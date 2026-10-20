@@ -1,0 +1,6 @@
+numpy
+trimesh
+PySide6
+pyvista
+pyvistaqt
+pytest
