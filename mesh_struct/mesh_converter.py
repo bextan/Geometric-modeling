@@ -4,6 +4,8 @@ from mesh_struct.vertex import Vertex
 from mesh_struct.half_edge import HalfEdge
 from mesh_struct.face import Face
 
+import numpy as np 
+
 from pathlib import Path
 
 def load_mesh(file_path):
@@ -63,11 +65,26 @@ def load_mesh(file_path):
 
 def main():
     
-    custom_mesh = load_mesh("files/jack-o-lantern-duck.stl")
+    file_mesh = load_mesh("files/jack-o-lantern-duck.stl")
 
-    print("Vertices:", len(custom_mesh.vertices))
-    print("Half-edges:", len(custom_mesh.half_edges))
-    print("Faces:", len(custom_mesh.faces))
+    points = np.array([vertex.position for vertex in file_mesh.vertices])
+    indices = []
+
+    for face in file_mesh.faces:
+        start = face.half_edge
+        edge = start
+        face_vertices = []
+
+        while True:
+            face_vertices.append(edge.origin.index)
+            edge = edge.next
+
+            if edge == start:
+                indices.append(len(face_vertices))
+                for vertex in face_vertices:
+                     indices.append(vertex)
+                break
+
 
 
 if __name__ == "__main__":
