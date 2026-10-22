@@ -1,4 +1,4 @@
-from face import Face
+from mesh_struct.face import Face
 
 class HalfEdge:
     def __init__(self, origin):

@@ -1,8 +1,8 @@
 import trimesh
-from mesh import Mesh
-from vertex import Vertex
-from half_edge import HalfEdge
-from face import Face
+from mesh_struct.mesh import Mesh
+from mesh_struct.vertex import Vertex
+from mesh_struct.half_edge import HalfEdge
+from mesh_struct.face import Face
 
 from pathlib import Path
 
