@@ -1,8 +1,8 @@
 
-from mesh_struct.vertex import Vertex
-from mesh_struct.half_edge import HalfEdge
-from mesh_struct.face import Face
-from mesh_struct.mesh import Mesh
+from mesh.vertex import Vertex
+from mesh.half_edge import HalfEdge
+from mesh.face import Face
+from mesh.mesh import Mesh
 
 
 def test_triangle_mesh():
