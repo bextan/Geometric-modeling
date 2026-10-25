@@ -53,6 +53,8 @@ class MeshLoader(QThread):
 
         self.start()
 
+
+    
     def load_mesh(self):
         self.progress.emit(5, "Reading file...")
         path = Path(self.file_path)
@@ -60,59 +62,22 @@ class MeshLoader(QThread):
         # if path.suffix.lower() not in (".stl", ".obj"):
         #     raise ValueError("Only STL and OBJ files are supported")
         
-        mesh = trimesh.load(path, force="mesh", process=False)
-        if not isinstance(mesh, trimesh.Trimesh):
+        file_mesh = trimesh.load(path, force="mesh", process=True)
+        if not isinstance(file_mesh, trimesh.Trimesh):
             raise TypeError("The file did not produce a triangular mesh")
 
+        custom_mesh = Mesh()
+
         self.progress.emit(25, "Building vertices...")
-        vertices = []
-
-        for index, position in enumerate(mesh.vertices):
-
-            vertex = Vertex(index, position)
-            vertices.append(vertex)
-
-        faces = []
-        half_edges = []
+        custom_mesh.build_vertices(file_mesh.vertices)
 
         self.progress.emit(45, "Building faces...")
-        for index, face_indices in enumerate(mesh.faces):
-            face = Face(index)
-            faces.append(face)
-
-
-            face_half_edges = []
-
-            
-            for i in face_indices:
-                half_edge = HalfEdge(vertices[i])
-                half_edges.append(half_edge)
-                half_edge.face = face
-                face_half_edges.append(half_edge)
-
-            for i in range(len(face_half_edges)):
-                face_half_edges[i].next = face_half_edges[(i + 1) % len(face_half_edges)]
-
-            face.half_edge = face_half_edges[0]
-
-        edge_map = {}
-
+        custom_mesh.build_faces_and_halfedges(file_mesh.faces)
 
         self.progress.emit(70, "Connecting half-edges...")
-        for half_edge in half_edges:
-            start = half_edge.origin.index
-            end = half_edge.next.origin.index
-
-            if (end, start) in edge_map:
-                twin = edge_map[(end, start)]
-                half_edge.twin = twin
-                twin.twin = half_edge
-            else: 
-                edge_map[(start, end)] = half_edge
-
-
+        custom_mesh.connect_half_edges()
         self.progress.emit(95, "Finalizing mesh...")
-        return Mesh(vertices, half_edges, faces)
+        return custom_mesh
 
     def update_loading_message(self, value, message):
         self.loading_overlay.set_message(message)
@@ -121,7 +86,7 @@ class MeshLoader(QThread):
         self.loading_overlay.set_progress(100)
         self.loading_overlay.set_message("Mesh loaded!")
         self.loading_overlay.hide()
-        self.parent_window.viewport.show_mesh(file_mesh)
+        self.parent_window.viewport.add_mesh(file_mesh)
     
     def on_mesh_error(self, error):
         self.loading_overlay.hide()

@@ -13,7 +13,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Mesh Subdivision")
         self.resize(1200, 700)
 
-        # Create the central container and viewport first
         container = QWidget()
         self.setCentralWidget(container)
 
@@ -36,3 +35,12 @@ class MainWindow(QMainWindow):
         open_action = QAction("Open...", self)
         open_action.triggered.connect(self.mesh_loader.open_file)
         file_menu.addAction(open_action)
+
+        menubar.addSeparator()
+        subdivide_menu = menubar.addMenu("Subdivide")
+        loop = QAction("Loop", self)
+        loop.triggered.connect(self.viewport.loop_subdivide)
+        butterfly = QAction("Butterfly", self)
+
+        subdivide_menu.addAction(loop)
+        subdivide_menu.addAction(butterfly)

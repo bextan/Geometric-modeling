@@ -3,7 +3,7 @@ import pyvista as pv
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QMenu, QFileDialog
 from PySide6.QtGui import QAction, QShortcut, QKeySequence
 from pyvistaqt import QtInteractor
-
+from algorithms.loop import LoopSubdivision
 import numpy as np
 import math
 
@@ -12,6 +12,7 @@ class Viewport(QWidget):
         super().__init__(parent)
 
         self.plotter = QtInteractor(self)
+        self.plotter.enable_lightkit()
         self.plotter.enable_ssao(
             radius=0.5,
             bias=0.01,
@@ -82,10 +83,17 @@ class Viewport(QWidget):
         loop = QAction("Loop", self)
         butterfly = QAction("Butterfly", self)
 
+        loop.triggered.connect(self.loop_subdivide)
         subdivide_menu.addAction(loop)
         subdivide_menu.addAction(butterfly)
         menu.exec(event.globalPos())
-        
+
+    def loop_subdivide(self):
+        loop_subdivision = LoopSubdivision(self.current_mesh)
+        subdivided_mesh = loop_subdivision.subdivide()
+        self.clear_grid()
+        self.add_mesh(subdivided_mesh)
+    
     def setup_grid(self, mesh=None):
         if mesh is not None:
             bounds = mesh.bounds
@@ -216,11 +224,12 @@ class Viewport(QWidget):
         self.plotter.render()
 
     
-    def show_mesh(self, file_mesh): 
-        points = np.array([vertex.position for vertex in file_mesh.vertices])
+    def add_mesh(self, input_mesh):
+        self.current_mesh = input_mesh 
+        points = np.array([vertex.position for vertex in input_mesh.vertices])
         indices = []
 
-        for face in file_mesh.faces:
+        for face in input_mesh.faces:
             start = face.half_edge
             edge = start
             face_vertices = []

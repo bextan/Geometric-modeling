@@ -83,4 +83,3 @@ def startWindow():
 
 if __name__ == "__main__":
     startWindow()
-    # main()
