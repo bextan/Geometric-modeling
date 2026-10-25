@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QMenu, QFileDialog
 from PySide6.QtGui import QAction, QShortcut, QKeySequence
 from pyvistaqt import QtInteractor
 from algorithms.loop import LoopSubdivision
+from algorithms.butterfly import ButterflySubdivision
 import numpy as np
 import math
 
@@ -84,6 +85,7 @@ class Viewport(QWidget):
         butterfly = QAction("Butterfly", self)
 
         loop.triggered.connect(self.loop_subdivide)
+        butterfly.triggered.connect(self.butterfly_subdivide)
         subdivide_menu.addAction(loop)
         subdivide_menu.addAction(butterfly)
         menu.exec(event.globalPos())
@@ -93,6 +95,12 @@ class Viewport(QWidget):
         subdivided_mesh = loop_subdivision.subdivide()
         self.clear_grid()
         self.add_mesh(subdivided_mesh)
+
+    def butterfly_subdivide(self):
+            butterfly_subdivision = ButterflySubdivision(self.current_mesh)
+            subdivided_mesh = butterfly_subdivision.subdivide()
+            self.clear_grid()
+            self.add_mesh(subdivided_mesh)
     
     def setup_grid(self, mesh=None):
         if mesh is not None:

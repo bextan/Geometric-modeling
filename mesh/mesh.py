@@ -63,16 +63,47 @@ class Mesh:
     
     def connect_half_edges(self):
         edge_map = {}
+
+        # Reset old twin connections before rebuilding them.
         for half_edge in self.half_edges:
+            half_edge.twin = None
+
+        for half_edge in self.half_edges:
+            if half_edge.next is None:
+                raise ValueError("Half-edge has no next pointer")
+
             start = half_edge.origin.index
             end = half_edge.next.origin.index
 
-            if (end, start) in edge_map:
-                twin = edge_map[(end, start)]
+            if start == end:
+                raise ValueError(
+                    f"Degenerate edge: vertex {start} connects to itself"
+                )
+
+            # Find the half-edge in the opposite direction.
+            opposite_key = (end, start)
+
+            if opposite_key in edge_map:
+                twin = edge_map.pop(opposite_key)
+
+                if twin.twin is not None:
+                    raise ValueError(
+                        f"Edge {start}->{end} has more than one twin"
+                    )
+
                 half_edge.twin = twin
                 twin.twin = half_edge
-            else: 
-                edge_map[(start, end)] = half_edge
+
+            else:
+                key = (start, end)
+
+                if key in edge_map:
+                    raise ValueError(
+                        f"Duplicate directed edge {start}->{end}. "
+                        "Check face orientation or duplicate faces."
+                    )
+
+                edge_map[key] = half_edge
 
     def get_unique_edges(self):
         unique_edges = {}

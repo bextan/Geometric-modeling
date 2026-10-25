@@ -40,7 +40,9 @@ class MainWindow(QMainWindow):
         subdivide_menu = menubar.addMenu("Subdivide")
         loop = QAction("Loop", self)
         loop.triggered.connect(self.viewport.loop_subdivide)
+        
         butterfly = QAction("Butterfly", self)
+        butterfly.triggered.connect(self.viewport.butterfly_subdivide)
 
         subdivide_menu.addAction(loop)
         subdivide_menu.addAction(butterfly)
