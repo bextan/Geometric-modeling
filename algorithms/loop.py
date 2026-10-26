@@ -1,6 +1,3 @@
-from re import S
-from turtle import pos
-
 import numpy as np
 
 from mesh.vertex import Vertex
@@ -11,30 +8,46 @@ from mesh.mesh import Mesh
 import math
 
 class LoopSubdivision():
-
     def __init__(self, input_mesh: Mesh):
         self.input_mesh = input_mesh
 
 
-    def subdivide(self)->Mesh:
+    def subdivide(self, progress_callback=None) -> Mesh:
+        self.report_progress(progress_callback, 10, "Getting unique edges...")
         self.unique_edges = self.input_mesh.get_unique_edges()
+
+        self.report_progress(
+            progress_callback, 25,
+            "Identifying boundary vertices and edges..."
+        )
         self.identify_boundary_vertices_and_edges()
+
+        self.report_progress(progress_callback, 35, "Calculating neighbours...")
         self.calculate_neighbours()
+
+        self.report_progress(progress_callback, 45, "Creating new vertices...")
         self.create_edge_vertices()
+
+        self.report_progress(
+            progress_callback, 60,
+            "Repositioning original vertices..."
+        )
         self.reposition_original_vertices()
 
-
+        self.report_progress(progress_callback, 75, "Splitting into triangles...")
         triangles = []
+
         for face in self.input_mesh.faces:
             triangles.extend(self.split_face_into_triangles(face))
 
         faces = []
         half_edges = []
+
         for index, triangle in enumerate(triangles):
             face = Face(index)
             faces.append(face)
             face_half_edges = []
-            
+
             for vertex in triangle:
                 half_edge = HalfEdge(vertex)
                 half_edges.append(half_edge)
@@ -42,14 +55,21 @@ class LoopSubdivision():
                 face_half_edges.append(half_edge)
 
             for i in range(len(face_half_edges)):
-                face_half_edges[i].next = face_half_edges[(i + 1) % len(face_half_edges)]
+                face_half_edges[i].next = face_half_edges[
+                    (i + 1) % len(face_half_edges)
+                ]
 
             face.half_edge = face_half_edges[0]
-        
+
         mesh = Mesh(self.list_vertices(), half_edges, faces)
         mesh.connect_half_edges()
 
+        self.report_progress(progress_callback, 100, "Finished!")
         return mesh
+    @staticmethod
+    def report_progress(callback, value, message):
+        if callback is not None:
+            callback(value, message)
 
     def reposition_original_vertices(self):
         new_positions = {}
@@ -161,4 +181,6 @@ class LoopSubdivision():
                     self.boundary_edges.add(half_edge)
                     self.boundary_vertices.add(half_edge.origin)
                     self.boundary_vertices.add(half_edge.next.origin)
+
+
     

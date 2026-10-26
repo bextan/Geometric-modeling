@@ -1,16 +1,40 @@
 import pyvista as pv
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QMenu, QFileDialog
-from PySide6.QtGui import QAction, QShortcut, QKeySequence
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QMenu,
+    QLabel,
+    )
+
+from PySide6.QtGui import QAction
 from pyvistaqt import QtInteractor
 from algorithms.loop import LoopSubdivision
 from algorithms.butterfly import ButterflySubdivision
+from PySide6.QtCore import QThread
+from ui.task_worker import TaskWorker
+from ui.loading_overlay import LoadingOverlay
 import numpy as np
 import math
+from PySide6.QtCore import QThread, Signal
+from PySide6.QtGui import QShortcut, QKeySequence
+from PySide6.QtCore import Qt
 
 class Viewport(QWidget):
+    mesh_stats_updated = Signal(int, int, int, int)
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.subdivide_shortcut = QShortcut(
+            QKeySequence("R"),
+            self
+        )
+        self.subdivide_shortcut.activated.connect(self.subdivide_again)
+
+        self.current_scheme = None
+        self.subdivision_level = 0
+        self.task_thread = None
+        self.task_worker = None
 
         self.plotter = QtInteractor(self)
         self.plotter.enable_lightkit()
@@ -51,9 +75,55 @@ class Viewport(QWidget):
         )
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+    
         layout.addWidget(self.plotter)
+
+        self.loading_overlay = LoadingOverlay(self)
+        self.loading_overlay.setGeometry(self.rect())
+        self.loading_overlay.hide()
+
         self.setup_grid()
 
+    def run_task(self, task, *args, on_finished, **kwargs):
+        if self.task_thread is not None:
+            return
+
+        self.loading_overlay.set_progress(0)
+        self.loading_overlay.set_message("Starting...")
+        self.loading_overlay.show()
+        self.loading_overlay.raise_()
+
+        self.task_thread = QThread(self)
+        self.task_worker = TaskWorker(task, *args, **kwargs)
+        self.task_worker.moveToThread(self.task_thread)
+
+        self.task_thread.started.connect(self.task_worker.run)
+
+        self.task_worker.progress.connect(self.on_task_progress)
+        self.task_worker.finished.connect(on_finished)
+        self.task_worker.error.connect(self.on_task_error)
+
+        self.task_worker.finished.connect(self.task_thread.quit)
+        self.task_worker.error.connect(self.task_thread.quit)
+
+        self.task_thread.finished.connect(self.loading_overlay.hide)
+        self.task_thread.finished.connect(self.cleanup_task)
+        self.task_thread.finished.connect(self.task_worker.deleteLater)
+        self.task_thread.finished.connect(self.task_thread.deleteLater)
+
+        self.task_thread.start()
+
+
+    def cleanup_task(self):
+        self.task_worker = None
+        self.task_thread = None
+
+    def on_task_error(self, message):
+        print(f"Task failed: {message}")
+
+
+        
     def update_mesh_style(self, caller, event):
         key = caller.GetKeySym()
 
@@ -90,19 +160,47 @@ class Viewport(QWidget):
         subdivide_menu.addAction(butterfly)
         menu.exec(event.globalPos())
 
+    def on_task_progress(self, value, message):
+        self.loading_overlay.set_progress(value)
+        self.loading_overlay.set_message(message)
     def loop_subdivide(self):
-        loop_subdivision = LoopSubdivision(self.current_mesh)
-        subdivided_mesh = loop_subdivision.subdivide()
-        self.clear_grid()
-        self.add_mesh(subdivided_mesh)
+        self.current_scheme = "Loop"
+        self.subdivide_again()
+
 
     def butterfly_subdivide(self):
-            butterfly_subdivision = ButterflySubdivision(self.current_mesh)
-            subdivided_mesh = butterfly_subdivision.subdivide()
-            self.clear_grid()
-            self.add_mesh(subdivided_mesh)
-    
+        self.current_scheme = "Butterfly"
+        self.subdivide_again()
+
+
+    def subdivide_again(self):
+        if not hasattr(self, "current_mesh"):
+            return
+
+        if self.current_scheme is None:
+            return
+
+        if self.task_thread is not None:
+            return
+
+        if self.current_scheme == "Loop":
+            algorithm = LoopSubdivision(self.current_mesh)
+        elif self.current_scheme == "Butterfly":
+            algorithm = ButterflySubdivision(self.current_mesh)
+        else:
+            return
+
+        self.run_task(
+            algorithm.subdivide,
+            on_finished=self.on_subdivision_finished
+        )
+
+    def on_subdivision_finished(self, mesh):
+        self.subdivision_level += 1
+        self.add_mesh(mesh, reset_level=False)
+        
     def setup_grid(self, mesh=None):
+        
         if mesh is not None:
             bounds = mesh.bounds
 
@@ -232,7 +330,14 @@ class Viewport(QWidget):
         self.plotter.render()
 
     
-    def add_mesh(self, input_mesh):
+    def add_mesh(self, input_mesh, reset_level=True):
+        self.current_mesh = input_mesh
+
+        if reset_level:
+            self.subdivision_level = 0
+            self.current_scheme = None
+
+        self.update_mesh_stats()
         self.current_mesh = input_mesh 
         points = np.array([vertex.position for vertex in input_mesh.vertices])
         indices = []
@@ -276,5 +381,21 @@ class Viewport(QWidget):
         self.plotter.reset_camera()
         self.plotter.render()
 
+    def update_mesh_stats(self):
+        if self.current_mesh is None:
+            self.mesh_stats_updated.emit(0, 0, 0, 0)
+            return
+
+        vertices = len(self.current_mesh.vertices)
+        edges = len(self.current_mesh.get_unique_edges())
+        faces = len(self.current_mesh.faces)
+
+        self.mesh_stats_updated.emit(
+            vertices,
+            edges,
+            faces,
+            self.subdivision_level,
+        )
     def set_open_file_callback(self, callback):
+        
         self.open_file_callback = callback
